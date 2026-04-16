@@ -24,6 +24,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("org.postgresql:postgresql")
+    // implementation("com.h2database:h2") // Removed H2 to force PostgreSQL usage
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.core:jackson-databind")

@@ -8,10 +8,10 @@ import java.time.Instant
 data class UserActivity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    var id: Long? = null,
 
     @Column(nullable = false)
-    val userId: Long = 0,
+    var userId: Long = 0,
 
     @Column(nullable = false, length = 1024)
     val action: String = "",
@@ -20,4 +20,4 @@ data class UserActivity(
     val createdAt: Instant = Instant.now(),
 )
 
-fun UserActivity.toResponse() = UserActivityResponse(id, userId, action, createdAt)
+fun UserActivity.toResponse() = UserActivityResponse(id ?: 0L, userId, action, createdAt)

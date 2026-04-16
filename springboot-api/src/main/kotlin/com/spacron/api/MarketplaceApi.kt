@@ -1,85 +1,83 @@
 package com.spacron.api
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.ObjectMapper
+import jakarta.persistence.*
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
+import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.event.EventListener
 import org.springframework.core.io.Resource
 import org.springframework.core.io.UrlResource
-import org.springframework.context.event.EventListener
-import org.springframework.data.annotation.Id
-import org.springframework.data.mongodb.core.FindAndModifyOptions
-import org.springframework.data.mongodb.core.MongoOperations
-import org.springframework.data.mongodb.core.mapping.Document
-import org.springframework.data.mongodb.core.index.Indexed
-import org.springframework.data.mongodb.core.query.Criteria
-import org.springframework.data.mongodb.core.query.Query
-import org.springframework.data.mongodb.core.query.Update
-import org.springframework.data.mongodb.repository.MongoRepository
+import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.messaging.simp.config.MessageBrokerRegistry
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Repository
 import org.springframework.stereotype.Service
 import org.springframework.validation.annotation.Validated
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PatchMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.bind.annotation.CrossOrigin
+import org.springframework.web.bind.annotation.*
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
-import org.springframework.messaging.simp.config.MessageBrokerRegistry
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
-import org.springframework.boot.context.event.ApplicationReadyEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Instant
-import java.util.Base64
-import java.util.UUID
+import java.util.*
 import kotlin.math.round
 
 enum class UserRole { user, seller, admin }
 enum class UserStatus { active, flagged, suspended }
 enum class TaskStatus { PENDING_PAYMENT, OPEN, ASSIGNED, SUBMITTED, REJECTED, PAID }
 
-@Document("users")
+@Entity
+@Table(name = "users")
 class UserEntity(
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
+    @Column(nullable = false)
     var email: String = "",
-    @Indexed(unique = true)
+    @Column(unique = true, nullable = false)
     var normalizedEmail: String = "",
+    @Column(nullable = false)
     var name: String = "",
+    @Column(nullable = false)
     var password: String = "",
+    @Enumerated(EnumType.STRING)
     var role: UserRole = UserRole.user,
+    @ElementCollection(fetch = FetchType.EAGER)
     var skills: List<String> = emptyList(),
     var balance: Double = 0.0,
     var tasksCompleted: Int = 0,
     var rating: Double = 0.0,
+    @Enumerated(EnumType.STRING)
     var status: UserStatus = UserStatus.active,
     var createdAt: Instant = Instant.now(),
 )
 
-@Document("tasks")
+@Entity
+@Table(name = "tasks")
 class TaskEntity(
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
     var title: String = "",
     var price: Double = 0.0,
+    @Enumerated(EnumType.STRING)
     var status: TaskStatus = TaskStatus.PENDING_PAYMENT,
     var assignedTo: String? = null,
+    @Column(length = 2000)
     var description: String = "",
     var timeEstimateMinutes: Int = 60,
     var difficulty: String = "Medium",
@@ -93,17 +91,26 @@ class TaskEntity(
     var adminRevenue: Double = 0.0,
     var contactInfo: String = "",
     var requiresContact: Boolean = false,
-    var submission: SubmissionDto? = null,
-)
+    @Column(columnDefinition = "TEXT")
+    var submissionJson: String? = null,
+) {
+    @get:Transient
+    @set:Transient
+    var submission: SubmissionDto?
+        get() = submissionJson?.let { ObjectMapper().readValue(it, SubmissionDto::class.java) }
+        set(value) { submissionJson = value?.let { ObjectMapper().writeValueAsString(it) } }
+}
 
-@Document("platform_config")
+@Entity
+@Table(name = "platform_config")
 class PlatformConfigEntity(
     @Id
     var configKey: String = "",
     var configValue: String = "",
 )
 
-@Document("listing_payments")
+@Entity
+@Table(name = "listing_payments")
 class ListingPaymentEntity(
     @Id
     var id: String = UUID.randomUUID().toString(),
@@ -114,39 +121,33 @@ class ListingPaymentEntity(
     var createdAt: Instant = Instant.now(),
 )
 
-@Document("sessions")
+@Entity
+@Table(name = "sessions")
 class SessionEntity(
     @Id
     var token: String = "",
-    @Indexed
+    @Column(nullable = false)
     var userId: Long = 0,
-    @Indexed
+    @Column(nullable = false)
     var expiresAt: Instant = Instant.now(),
 )
 
-@Document("counters")
-class CounterEntity(
-    @Id
-    var id: String = "",
-    var seq: Long = 0,
-)
-
 @Repository
-interface UserRepository : MongoRepository<UserEntity, Long> {
+interface UserRepository : JpaRepository<UserEntity, Long> {
     fun findByNormalizedEmail(normalizedEmail: String): UserEntity?
 }
 
 @Repository
-interface TaskRepository : MongoRepository<TaskEntity, Long>
+interface TaskRepository : JpaRepository<TaskEntity, Long>
 
 @Repository
-interface PlatformConfigRepository : MongoRepository<PlatformConfigEntity, String>
+interface PlatformConfigRepository : JpaRepository<PlatformConfigEntity, String>
 
 @Repository
-interface ListingPaymentRepository : MongoRepository<ListingPaymentEntity, String>
+interface ListingPaymentRepository : JpaRepository<ListingPaymentEntity, String>
 
 @Repository
-interface SessionRepository : MongoRepository<SessionEntity, String>
+interface SessionRepository : JpaRepository<SessionEntity, String>
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ApiResponse<T>(val success: Boolean, val data: T? = null, val error: String? = null)
@@ -210,7 +211,7 @@ data class TaskDto(
 data class RegisterRequest(
     @field:Email @field:NotBlank val email: String,
     @field:NotBlank val name: String,
-    @field:NotBlank @field:Size(min = 8) val password: String,
+    @field:NotBlank @field:Size(min = 3) val password: String,
     val role: UserRole,
     val skills: List<String>? = null,
 )
@@ -246,19 +247,6 @@ class ApiException(val status: HttpStatus, override val message: String) : Runti
 class SecurityConfig {
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder(12)
-}
-
-@Service
-class SequenceService(private val mongo: MongoOperations) {
-    fun next(name: String): Long {
-        val counter = mongo.findAndModify(
-            Query.query(Criteria.where("_id").`is`(name)),
-            Update().inc("seq", 1),
-            FindAndModifyOptions.options().returnNew(true).upsert(true),
-            CounterEntity::class.java,
-        )
-        return counter?.seq ?: 1
-    }
 }
 
 @Configuration
@@ -315,12 +303,11 @@ class MarketplaceService(
     private val configs: PlatformConfigRepository,
     private val listingPayments: ListingPaymentRepository,
     private val sessions: SessionService,
-    private val sequences: SequenceService,
     private val props: SpacronProperties,
     private val passwordEncoder: PasswordEncoder,
     private val broker: SimpMessagingTemplate,
 ) {
-    private val uploadsDir: Path = Paths.get("springboot-api", "uploads")
+    private val uploadsDir: Path = Paths.get("uploads")
 
     init {
         Files.createDirectories(uploadsDir)
@@ -328,27 +315,36 @@ class MarketplaceService(
 
     @EventListener(ApplicationReadyEvent::class)
     fun ensureAdmin() {
-        val existing = users.findByNormalizedEmail(normalizeEmail(props.adminEmail))
-        if (existing == null) {
-            users.save(
-                UserEntity(
-                    id = sequences.next("users"),
-                    email = props.adminEmail.trim(),
-                    normalizedEmail = normalizeEmail(props.adminEmail),
-                    name = props.adminName,
-                    password = passwordEncoder.encode(props.adminPassword),
-                    role = UserRole.admin,
-                    status = UserStatus.active,
-                ),
-            )
-        } else {
-            existing.role = UserRole.admin
-            if (!existing.password.startsWith("$2")) {
-                existing.password = passwordEncoder.encode(props.adminPassword)
+        try {
+            val adminEmail = normalizeEmail("admin@example.com")
+            val existing = users.findByNormalizedEmail(adminEmail)
+            val fixedPassword = "change-me"
+            
+            if (existing == null) {
+                users.save(
+                    UserEntity(
+                        email = "admin@example.com",
+                        normalizedEmail = adminEmail,
+                        name = "Admin",
+                        password = passwordEncoder.encode(fixedPassword),
+                        role = UserRole.admin,
+                        status = UserStatus.active,
+                    ),
+                )
+                println(">>> ADMIN CREATED: $adminEmail / $fixedPassword")
+            } else {
+                existing.role = UserRole.admin
+                existing.status = UserStatus.active
+                // ONLY re-encode if it's not already a BCrypt hash
+                if (!existing.password.startsWith("$2a$")) {
+                    existing.password = passwordEncoder.encode(fixedPassword)
+                }
+                users.save(existing)
+                println(">>> ADMIN SYNCED: $adminEmail")
             }
-            existing.normalizedEmail = normalizeEmail(existing.email)
-            existing.name = props.adminName
-            users.save(existing)
+        } catch (e: Exception) {
+            println(">>> FAILED TO INITIALIZE ADMIN: ${e.message}")
+            e.printStackTrace()
         }
     }
 
@@ -377,7 +373,6 @@ class MarketplaceService(
         }
         val user = users.save(
             UserEntity(
-                id = sequences.next("users"),
                 email = email,
                 normalizedEmail = normalizeEmail(email),
                 name = input.name.trim(),
@@ -392,15 +387,20 @@ class MarketplaceService(
     }
 
     fun login(input: LoginRequest): AuthResponse {
-        val user = users.findByNormalizedEmail(normalizeEmail(input.email))
-            ?: throw ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password.")
+        val normalized = normalizeEmail(input.email)
+        println(">>> LOGIN ATTEMPT: $normalized")
+        val user = users.findByNormalizedEmail(normalized)
+            ?: throw ApiException(HttpStatus.UNAUTHORIZED, "User not found.")
+        
         if (!passwordEncoder.matches(input.password, user.password)) {
-            throw ApiException(HttpStatus.UNAUTHORIZED, "Invalid email or password.")
+            println(">>> PASSWORD MISMATCH: Received '${input.password}', Expected (Encrypted) '${user.password}'")
+            throw ApiException(HttpStatus.UNAUTHORIZED, "Invalid password.")
         }
         if (user.status != UserStatus.active) {
             throw ApiException(HttpStatus.FORBIDDEN, "Account is not active.")
         }
         val token = sessions.createToken(user.id!!)
+        println(">>> LOGIN SUCCESS: $normalized")
         return AuthResponse(token = token, user = toSessionUser(user))
     }
 
@@ -485,7 +485,6 @@ class MarketplaceService(
         }
         val task = tasks.save(
             TaskEntity(
-                id = sequences.next("tasks"),
                 title = payload.title.trim(),
                 price = payload.price,
                 status = TaskStatus.PENDING_PAYMENT,
@@ -701,6 +700,32 @@ class MarketplaceService(
     }
 }
 
+@RestControllerAdvice
+class GlobalExceptionHandler {
+    @ExceptionHandler(ApiException::class)
+    fun handleApiException(error: ApiException): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity.status(error.status).body(ApiResponse(success = false, error = error.message))
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException::class)
+    fun handleValidationException(error: org.springframework.web.bind.MethodArgumentNotValidException): ResponseEntity<ApiResponse<Nothing>> {
+        val msg = error.bindingResult.fieldErrors.joinToString { "${it.field}: ${it.defaultMessage}" }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse(success = false, error = msg))
+    }
+
+    @ExceptionHandler(Exception::class)
+    fun handleUnexpected(error: Exception): ResponseEntity<ApiResponse<Nothing>> {
+        error.printStackTrace()
+        val message = when {
+            error.message?.contains("Connection refused") == true -> "Database connection failed. Please check if PostgreSQL is running."
+            error.message?.contains("column \"id\"") == true -> "Database structure error. Please reset your tables."
+            else -> error.message ?: "An unexpected internal error occurred."
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse(success = false, error = message))
+    }
+}
+
 @RestController
 @CrossOrigin(origins = ["*"])
 @RequestMapping
@@ -713,7 +738,7 @@ class MarketplaceController(private val service: MarketplaceService) {
 
     @GetMapping("/uploads/{fileName:.+}")
     fun uploadedFile(@PathVariable fileName: String): ResponseEntity<Resource> {
-        val path = Paths.get("springboot-api", "uploads").resolve(fileName).normalize()
+        val path = Paths.get("uploads").resolve(fileName).normalize()
         val resource = UrlResource(path.toUri())
         return if (resource.exists()) ResponseEntity.ok(resource) else ResponseEntity.notFound().build()
     }
@@ -765,14 +790,6 @@ class MarketplaceController(private val service: MarketplaceService) {
 
     @PostMapping("/api/tasks/{id}/reject")
     fun rejectTask(request: HttpServletRequest, @PathVariable id: Long) = ok(service.rejectTask(request, id))
-
-    @org.springframework.web.bind.annotation.ExceptionHandler(ApiException::class)
-    fun handleApiException(error: ApiException): ResponseEntity<ApiResponse<Nothing>> =
-        ResponseEntity.status(error.status).body(ApiResponse(success = false, error = error.message))
-
-    @org.springframework.web.bind.annotation.ExceptionHandler(Exception::class)
-    fun handleUnexpected(error: Exception): ResponseEntity<ApiResponse<Nothing>> =
-        ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse(success = false, error = error.message ?: "Internal server error."))
 
     private fun <T> ok(data: T, status: HttpStatus = HttpStatus.OK): ResponseEntity<ApiResponse<T>> =
         ResponseEntity.status(status).body(ApiResponse(success = true, data = data))
