@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+**/build/
+.gradle
+
+# IntelliJ / VS Code
+.idea/
+*.iml
+.vscode/
+
+# Java
+*.class
+*.log
+*.jar
+*.war
+*.ear
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# Spring Boot
+spring-boot-app
+
+# Local environment
+.env
