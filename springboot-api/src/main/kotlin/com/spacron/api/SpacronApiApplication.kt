@@ -13,9 +13,9 @@ class SpacronApiApplication
 
 @ConfigurationProperties(prefix = "spacron")
 data class SpacronProperties(
-    var adminEmail: String = "admin@example.com",
+    var adminEmail: String = "officialspacron1426@gmail.com",
     var adminPassword: String = "change-me",
-    var adminName: String = "Admin",
+    var adminName: String = "Spacron Official",
     var defaultCommissionPct: Int = 15,
     var sessionDays: Long = 7,
 )
