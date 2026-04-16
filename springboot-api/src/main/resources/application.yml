@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    mongodb:
+      uri: ${SPACRON_MONGODB_URI:mongodb://localhost:27017/spacron}
+      auto-index-creation: true
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 12MB
+
+spacron:
+  admin-email: jibiteshkumarmishra8027@gmail.com
+  admin-password: jibitesh@2004
+  admin-name: Admin
+  default-commission-pct: 15
+  session-days: 7
